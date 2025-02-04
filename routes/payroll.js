@@ -17,7 +17,10 @@ router.post("/", authenticateUser, async (req, res) => {
     const workingDays = attendance[0].workingDays;
     const hoursWorked = workingDays * 8;
 
-    const [employees] = await pool.execute("SELECT salary FROM Employees WHERE employee_id = ?", [employeeId]);
+    const [employees] = await pool.execute(
+      "SELECT salary FROM Employees WHERE employee_id = ?",
+      [employeeId]
+    );
     const salary = employees[0]?.salary || 0;
     const hourlyRate = salary / 160;
 
