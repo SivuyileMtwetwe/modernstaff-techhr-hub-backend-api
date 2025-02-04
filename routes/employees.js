@@ -1,44 +1,32 @@
 import express from "express";
 import { authenticateAdmin } from "../middleware/authMiddleware.js";
+import { pool } from "../server.js";
 
 const router = express.Router();
-const employees = []; // Temporary storage
 
-// Get all employees (Admin only)
-router.get("/", authenticateAdmin, (req, res) => {
-  res.json(employees);
+// Get all employees
+router.get("/", authenticateAdmin, async (req, res) => {
+  try {
+    const [employees] = await pool.execute("SELECT * FROM Employees");
+    res.json(employees);
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
-// Add a new employee (Admin only)
-router.post("/", authenticateAdmin, (req, res) => {
-  const { name, position, department, salary } = req.body;
-  const employeeId = employees.length + 1;
-  const newEmployee = { id: employeeId, name, position, department, salary };
+// Add Employee
+router.post("/", authenticateAdmin, async (req, res) => {
+  const { name, position, department_id, salary, contact } = req.body;
 
-  employees.push(newEmployee);
-  res.status(201).json(newEmployee);
-});
-
-// Update an employee (Admin only)
-router.put("/:id", authenticateAdmin, (req, res) => {
-  const { id } = req.params;
-  const employee = employees.find((e) => e.id == id);
-
-  if (!employee) return res.status(404).json({ message: "Employee not found" });
-
-  Object.assign(employee, req.body);
-  res.json({ message: "Employee updated", employee });
-});
-
-// Delete an employee (Admin only)
-router.delete("/:id", authenticateAdmin, (req, res) => {
-  const { id } = req.params;
-  const index = employees.findIndex((e) => e.id == id);
-
-  if (index === -1) return res.status(404).json({ message: "Employee not found" });
-
-  employees.splice(index, 1);
-  res.json({ message: "Employee deleted" });
+  try {
+    await pool.execute(
+      "INSERT INTO Employees (name, position, department_id, salary, contact) VALUES (?, ?, ?, ?, ?)",
+      [name, position, department_id, salary, contact]
+    );
+    res.status(201).json({ message: "Employee added successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 export default router;

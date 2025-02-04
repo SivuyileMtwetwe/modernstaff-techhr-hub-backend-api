@@ -1,21 +1,19 @@
 import express from "express";
 import { authenticateUser } from "../middleware/authMiddleware.js";
+import { pool } from "../server.js";
 
 const router = express.Router();
-const attendanceRecords = [];
 
-// Mark attendance (Employee only)
-router.post("/", authenticateUser, (req, res) => {
+// Mark Attendance
+router.post("/", authenticateUser, async (req, res) => {
   const { employeeId, status } = req.body;
-  const record = { employeeId, date: new Date().toISOString().split("T")[0], status };
 
-  attendanceRecords.push(record);
-  res.json({ message: "Attendance marked", record });
-});
-
-// Get all attendance records (Admin only)
-router.get("/", authenticateUser, (req, res) => {
-  res.json(attendanceRecords);
+  try {
+    await pool.execute("INSERT INTO Attendance (employee_id, date, status) VALUES (?, CURDATE(), ?)", [employeeId, status]);
+    res.json({ message: "Attendance marked successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 export default router;

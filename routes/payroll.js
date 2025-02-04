@@ -1,27 +1,34 @@
 import express from "express";
 import { authenticateUser } from "../middleware/authMiddleware.js";
-import { generatePayslip } from "../utils/payslip.js";
+import { pool } from "../server.js";
 
 const router = express.Router();
-const employees = []; // Temporary employee data
-const attendanceRecords = []; // Temporary attendance data
 
-// Generate Payslip (Employee Only)
+// Generate Payslip
 router.post("/", authenticateUser, async (req, res) => {
   const { employeeId, startDate, endDate } = req.body;
 
-  // Find employee
-  const employee = employees.find((e) => e.id == employeeId);
-  if (!employee) return res.status(404).json({ message: "Employee not found" });
+  try {
+    const [attendance] = await pool.execute(
+      "SELECT COUNT(*) as workingDays FROM Attendance WHERE employee_id = ? AND date BETWEEN ? AND ? AND status = 'Present'",
+      [employeeId, startDate, endDate]
+    );
 
-  // Filter attendance for the requested period
-  const attendance = attendanceRecords.filter((a) => {
-    return a.employeeId == employeeId && a.date >= startDate && a.date <= endDate;
-  });
+    const workingDays = attendance[0].workingDays;
+    const hoursWorked = workingDays * 8;
 
-  // Generate payslip
-  const payslip = generatePayslip(employee, attendance);
-  res.json(payslip);
+    const [employees] = await pool.execute("SELECT salary FROM Employees WHERE employee_id = ?", [employeeId]);
+    const salary = employees[0]?.salary || 0;
+    const hourlyRate = salary / 160;
+
+    const grossSalary = hoursWorked * hourlyRate;
+    const tax = grossSalary * 0.2;
+    const netSalary = grossSalary - tax;
+
+    res.json({ workingDays, hoursWorked, grossSalary, tax, netSalary });
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 export default router;

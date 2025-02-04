@@ -1,43 +1,33 @@
 import express from "express";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import dotenv from "dotenv";
+import { pool } from "../server.js";
 
 dotenv.config();
 const router = express.Router();
 
-const users = []; // Temporary storage, replace with DB later
-
-// Generate JWT token
+// Generate JWT Token
 const generateToken = (user) => {
-  return jwt.sign({ id: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  return jwt.sign({ id: user.employee_id, role: user.position }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
 
-// Admin & Employee Login
+// Employee Login
 router.post("/login", async (req, res) => {
-  const { username, password } = req.body;
-  const user = users.find((u) => u.username === username);
+  const { contact } = req.body;
 
-  if (!user) return res.status(400).json({ message: "User not found" });
+  try {
+    const [users] = await pool.execute("SELECT * FROM Employees WHERE contact = ?", [contact]);
 
-  const isMatch = await bcrypt.compare(password, user.password);
-  if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (users.length === 0) return res.status(400).json({ message: "User not found" });
 
-  const token = generateToken(user);
-  res.json({ token, user: { username: user.username, role: user.role } });
-});
+    const user = users[0];
+    const token = generateToken(user);
 
-// Register (Admin only)
-router.post("/register", async (req, res) => {
-  const { username, password, role } = req.body;
+    res.json({ token, user: { id: user.employee_id, name: user.name, position: user.position, role: user.position } });
 
-  if (!username || !password || !role) return res.status(400).json({ message: "Missing fields" });
-
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = { id: users.length + 1, username, password: hashedPassword, role };
-  
-  users.push(newUser);
-  res.status(201).json({ message: "User registered successfully" });
+  } catch (error) {
+    res.status(500).json({ error: "Database error", details: error.message });
+  }
 });
 
 export default router;

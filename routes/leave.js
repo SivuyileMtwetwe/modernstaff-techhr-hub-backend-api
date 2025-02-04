@@ -1,28 +1,21 @@
 import express from "express";
 import { authenticateUser, authenticateAdmin } from "../middleware/authMiddleware.js";
+import { pool } from "../server.js";
 
 const router = express.Router();
-const leaveRequests = [];
 
-// Submit leave request (Employee only)
-router.post("/", authenticateUser, (req, res) => {
+// Submit Leave Request
+router.post("/", authenticateUser, async (req, res) => {
   const { employeeId, date, reason } = req.body;
-  const request = { id: leaveRequests.length + 1, employeeId, date, reason, status: "Pending" };
 
-  leaveRequests.push(request);
-  res.json({ message: "Leave request submitted", request });
-});
-
-// Approve or Reject leave request (Admin only)
-router.put("/:id", authenticateAdmin, (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-  const request = leaveRequests.find((r) => r.id == id);
-
-  if (!request) return res.status(404).json({ message: "Request not found" });
-
-  request.status = status;
-  res.json({ message: "Leave request updated", request });
+  try {
+    await pool.execute("INSERT INTO LeaveRequests (employee_id, date, reason, status) VALUES (?, ?, ?, 'Pending')",
+      [employeeId, date, reason]
+    );
+    res.json({ message: "Leave request submitted" });
+  } catch (error) {
+    res.status(500).json({ error: "Database error" });
+  }
 });
 
 export default router;
