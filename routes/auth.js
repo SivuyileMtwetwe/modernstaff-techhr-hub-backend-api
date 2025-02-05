@@ -9,7 +9,9 @@ const router = express.Router();
 
 // 🔹 Generate JWT Token
 const generateToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
+    expiresIn: "1h",
+  });
 };
 
 // 🔹 Register New User (Admin Only)
@@ -18,7 +20,8 @@ router.post("/register", async (req, res) => {
 
   try {
     const existingUser = await User.findOne({ contact });
-    if (existingUser) return res.status(400).json({ message: "User already exists" });
+    if (existingUser)
+      return res.status(400).json({ message: "User already exists" });
 
     const newUser = new User({ name, contact, password, role });
     await newUser.save();
@@ -40,12 +43,15 @@ router.post("/login", async (req, res) => {
 
     // 🔹 Verify password
     const isMatch = await user.comparePassword(password);
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+    if (!isMatch)
+      return res.status(401).json({ message: "Invalid credentials" });
 
     // 🔹 Generate JWT token
     const token = generateToken(user);
-    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
-
+    res.json({
+      token,
+      user: { id: user._id, name: user.name, role: user.role },
+    });
   } catch (error) {
     res.status(500).json({ error: "Database error", details: error.message });
   }
