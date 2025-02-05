@@ -1,33 +1,53 @@
 import express from "express";
-import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { pool } from "../config/db.js";
+import bcrypt from "bcryptjs";
+import dotenv from "dotenv";
+import { User } from "../models/user.js";
 
+dotenv.config();
 const router = express.Router();
 
+// 🔹 Generate JWT Token
 const generateToken = (user) => {
-  return jwt.sign({ id: user.employee_id, role: user.position }, process.env.JWT_SECRET, { expiresIn: "1h" });
+  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, { expiresIn: "1h" });
 };
 
-// Login Route
-router.post("/login", async (req, res) => {
-  const { contact, password } = req.body;
+// 🔹 Register New User (Admin Only)
+router.post("/register", async (req, res) => {
+  const { name, contact, password, role } = req.body;
 
   try {
-    const [users] = await pool.execute("SELECT * FROM Employees WHERE contact = ?", [contact]);
-    if (users.length === 0) return res.status(400).json({ message: "User not found" });
+    const existingUser = await User.findOne({ contact });
+    if (existingUser) return res.status(400).json({ message: "User already exists" });
 
-    const user = users[0];
+    const newUser = new User({ name, contact, password, role });
+    await newUser.save();
 
-    if (!(await bcrypt.compare(password, user.password))) {
-      return res.status(401).json({ message: "Invalid credentials" });
-    }
-
-    const token = generateToken(user);
-    res.json({ token, user: { id: user.employee_id, name: user.name, position: user.position, role: user.position } });
+    res.status(201).json({ message: "User registered successfully!" });
   } catch (error) {
     res.status(500).json({ error: "Database error", details: error.message });
   }
 });
 
+// 🔹 Login User
+router.post("/login", async (req, res) => {
+  const { contact, password } = req.body;
+
+  try {
+    // 🔹 Find the user in MongoDB
+    const user = await User.findOne({ contact });
+    if (!user) return res.status(400).json({ message: "User not found" });
+
+    // 🔹 Verify password
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
+
+    // 🔹 Generate JWT token
+    const token = generateToken(user);
+    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+
+  } catch (error) {
+    res.status(500).json({ error: "Database error", details: error.message });
+  }
+});
 export default router;
