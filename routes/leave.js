@@ -3,7 +3,7 @@ import {
   authenticateUser,
   authenticateAdmin,
 } from "../middleware/authMiddleware.js";
-import { pool } from "../server.js";
+import { pool } from "../config/db.js";
 
 const router = express.Router();
 
