@@ -41,19 +41,26 @@ router.post("/login", async (req, res) => {
     const user = await User.findOne({ contact });
     if (!user) return res.status(400).json({ message: "User not found" });
 
-    // 🔹 Verify password
-    const isMatch = await user.comparePassword(password);
-    if (!isMatch)
-      return res.status(401).json({ message: "Invalid credentials" });
+    console.log("User found:", user);
+
+    // 🔹 Check if password is stored correctly
+    console.log("Stored Password in MongoDB:", user.password);
+    console.log("Entered Password:", password);
+
+    // 🔹 Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    console.log("Password Match:", isMatch);
+
+    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
 
     // 🔹 Generate JWT token
     const token = generateToken(user);
-    res.json({
-      token,
-      user: { id: user._id, name: user.name, role: user.role },
-    });
+    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
+
   } catch (error) {
+    console.error("Login error:", error);
     res.status(500).json({ error: "Database error", details: error.message });
   }
 });
+
 export default router;

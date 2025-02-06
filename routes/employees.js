@@ -39,35 +39,29 @@ router.get("/:id", authenticateAdmin, async (req, res) => {
 
 // 🔹 3️⃣ Create a New Employee (Admin Only)
 router.post("/", authenticateAdmin, async (req, res) => {
-  const { name, position, department_id, salary, contact, password } = req.body;
-
-  if (!password)
-    return res.status(400).json({ message: "Password is required" });
+  const { name, position, department_id, salary, contact } = req.body;
 
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // 🔹 Insert into MySQL
+    // 🔹 Step 1: Insert into MySQL
     const [result] = await pool.execute(
       "INSERT INTO Employees (name, position, department_id, salary, contact) VALUES (?, ?, ?, ?, ?)",
       [name, position, department_id, salary, contact]
     );
 
-    // 🔹 Insert into MongoDB (for authentication)
+    // 🔹 Step 2: Generate a default hashed password
+    const hashedPassword = await bcrypt.hash("password123", 10);
+
+    // 🔹 Step 3: Save employee credentials in MongoDB
     const newUser = new User({
       name,
       contact,
       password: hashedPassword,
       role: "Employee",
     });
+
     await newUser.save();
 
-    res
-      .status(201)
-      .json({
-        message: "Employee added successfully!",
-        employee_id: result.insertId,
-      });
+    res.status(201).json({ message: "Employee added successfully!", employee_id: result.insertId });
   } catch (error) {
     console.error("Error adding employee:", error);
     res.status(500).json({ error: "Database error", details: error.message });
