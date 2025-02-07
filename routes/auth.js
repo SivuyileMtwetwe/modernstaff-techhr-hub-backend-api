@@ -3,6 +3,7 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import dotenv from "dotenv";
 import { User } from "../models/user.js";
+import { authenticateUser } from "../middleware/authMiddleware.js";
 
 dotenv.config();
 const router = express.Router();
@@ -13,6 +14,19 @@ const generateToken = (user) => {
     expiresIn: "1h",
   });
 };
+
+
+// Refresh Token (Add this to routes/auth.js)
+router.post("/refresh", authenticateUser, async (req, res) => {
+  try {
+      const user = await User.findById(req.user.id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+      const newToken = generateToken(user);
+      res.json({ token: newToken });
+  } catch (error) {
+      res.status(500).json({ error: "Token refresh failed" });
+  }
+});
 
 // 🔹 Register New User (Admin Only)
 router.post("/register", async (req, res) => {
