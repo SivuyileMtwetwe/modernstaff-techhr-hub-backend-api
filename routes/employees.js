@@ -31,4 +31,36 @@ router.get('/:id', authenticate, async (req, res) => {
   }
 });
 
+router.post('/', authenticate, authorizeRole('admin'), async (req, res) => {
+  try {
+    const { name,position, department_id, salary ,employment_history,contact} = req.body;
+    await db.query('INSERT INTO Employees ( name,position, department_id, salary ,employment_history,contact) VALUES (?, ?, ?,?,?,?)', [ name,position, department_id, salary ,employment_history,contact]);
+    res.status(201).json({ message: 'Employee added successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Update employee details
+router.put('/:id', authenticate, authorizeRole('admin'), async (req, res) => {
+  try {
+    const {name,position, department_id, salary ,employment_history,contact } = req.body;
+    await db.query('UPDATE Employees SET name = ?,position = ?, department_id = ?, salary = ? ,employment_history = ?,contact = ? WHERE employee_id = ?', [name,position, department_id, salary ,employment_history,contact, req.params.id]);
+    res.json({ message: 'Employee updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Delete employee
+router.delete('/:id', authenticate, authorizeRole('admin'), async (req, res) => {
+  try {
+    await db.query('DELETE FROM Employees WHERE employee_id = ?', [req.params.id]);
+    res.json({ message: 'Employee deleted successfully' });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+});
+
+
 export default router;
