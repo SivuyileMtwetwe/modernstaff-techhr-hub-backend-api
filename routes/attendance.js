@@ -1,18 +1,35 @@
-import express from "express";
-import { authenticateUser } from "../middleware/authMiddleware.js";
-import { pool } from "../config/db.js";
+import express from 'express';
+import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
+import db from '../config/db.js';
 
 const router = express.Router();
 
-// Mark Attendance
-router.post("/", authenticateUser, async (req, res) => {
-  const { employeeId, status } = req.body;
-
+// Record attendance
+router.post('/', authenticate, async (req, res) => {
   try {
-    await pool.execute("INSERT INTO Attendance (employee_id, date, status) VALUES (?, CURDATE(), ?)", [employeeId, status]);
-    res.json({ message: "Attendance marked successfully" });
+    const { employee_id, date, status } = req.body;
+    
+    await db.query(
+      'INSERT INTO Attendance (employee_id, date, status) VALUES (?, ?, ?)',
+      [employee_id, date, status]
+    );
+    
+    res.status(201).json({ message: 'Attendance recorded' });
   } catch (error) {
-    res.status(500).json({ error: "Database error" });
+    res.status(500).json({ message: error.message });
+  }
+});
+
+// Get attendance records
+router.get('/:employee_id', authenticate, async (req, res) => {
+  try {
+    const [records] = await db.query(
+      'SELECT * FROM Attendance WHERE employee_id = ?',
+      [req.params.employee_id]
+    );
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 

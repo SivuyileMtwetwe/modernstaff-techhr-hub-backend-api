@@ -1,79 +1,41 @@
-import express from "express";
-import jwt from "jsonwebtoken";
-import bcrypt from "bcryptjs";
-import dotenv from "dotenv";
-import { User } from "../models/user.js";
-import { authenticateUser } from "../middleware/authMiddleware.js";
+import express from 'express';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+import db from '../config/db.js';
 
-dotenv.config();
 const router = express.Router();
 
-// 🔹 Generate JWT Token
-const generateToken = (user) => {
-  return jwt.sign({ id: user._id, role: user.role }, process.env.JWT_SECRET, {
-    expiresIn: "1h",
-  });
-};
-
-
-// Refresh Token (Add this to routes/auth.js)
-router.post("/refresh", authenticateUser, async (req, res) => {
-  try {
-      const user = await User.findById(req.user.id);
-      if (!user) return res.status(404).json({ message: "User not found" });
-      const newToken = generateToken(user);
-      res.json({ token: newToken });
-  } catch (error) {
-      res.status(500).json({ error: "Token refresh failed" });
-  }
-});
-
-// 🔹 Register New User (Admin Only)
-router.post("/register", async (req, res) => {
-  const { name, contact, password, role } = req.body;
+// Login endpoint
+router.post('/login', async (req, res) => {
+  const { username, password } = req.body;
 
   try {
-    const existingUser = await User.findOne({ contact });
-    if (existingUser)
-      return res.status(400).json({ message: "User already exists" });
+    // Fetch the user from the database
+    const [users] = await db.query('SELECT * FROM Users WHERE username = ?', [username]);
 
-    const newUser = new User({ name, contact, password, role });
-    await newUser.save();
+    if (users.length === 0) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
 
-    res.status(201).json({ message: "User registered successfully!" });
+    const user = users[0];
+
+    // Compare the provided password with the hashed password
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    // Generate a JWT token
+    const token = jwt.sign(
+      { user_id: user.user_id, role: user.role, employee_id: user.employee_id },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Send the token and user role to the frontend
+    res.json({ token, role: user.role, employee_id: user.employee_id });
   } catch (error) {
-    res.status(500).json({ error: "Database error", details: error.message });
-  }
-});
-
-// 🔹 Login User
-router.post("/login", async (req, res) => {
-  const { contact, password } = req.body;
-
-  try {
-    // 🔹 Find the user in MongoDB
-    const user = await User.findOne({ contact });
-    if (!user) return res.status(400).json({ message: "User not found" });
-
-    console.log("User found:", user);
-
-    // 🔹 Check if password is stored correctly
-    console.log("Stored Password in MongoDB:", user.password);
-    console.log("Entered Password:", password);
-
-    // 🔹 Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
-    console.log("Password Match:", isMatch);
-
-    if (!isMatch) return res.status(401).json({ message: "Invalid credentials" });
-
-    // 🔹 Generate JWT token
-    const token = generateToken(user);
-    res.json({ token, user: { id: user._id, name: user.name, role: user.role } });
-
-  } catch (error) {
-    console.error("Login error:", error);
-    res.status(500).json({ error: "Database error", details: error.message });
+    res.status(500).json({ message: error.message });
   }
 });
 
